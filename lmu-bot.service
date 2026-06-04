@@ -1,0 +1,26 @@
+# Service systemd pour faire tourner le bot 24/7 sur la VM GCP.
+#
+# Installation sur la VM :
+#   sudo cp lmu-bot.service /etc/systemd/system/lmu-bot.service
+#   # adapter User et les chemins ci-dessous (whoami pour ton user GCP)
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable lmu-bot
+#   sudo systemctl start lmu-bot
+#   sudo journalctl -u lmu-bot -f      # suivre les logs
+
+[Unit]
+Description=LMU Setup Download Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# TODO: remplacer par ton user Linux GCP (résultat de `whoami`)
+User=CHANGE_ME
+WorkingDirectory=/home/CHANGE_ME/lmu-bot
+ExecStart=/home/CHANGE_ME/lmu-bot/venv/bin/python /home/CHANGE_ME/lmu-bot/bot.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
