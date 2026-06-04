@@ -28,3 +28,5 @@ DOWNLOAD_DIR = BASE_DIR / "downloads"          # fichiers téléchargés (tempor
 AUTH_STATE_PATH = BASE_DIR / "auth_state.json"  # session Playwright persistée
 
 DOWNLOAD_DIR.mkdir(exist_ok=True)
+
+HEADLESS = os.environ["HEADLESS"].lower() == "true"

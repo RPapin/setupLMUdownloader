@@ -5,6 +5,7 @@ import asyncio
 import logging
 from pathlib import Path
 
+import dotenv
 from playwright.async_api import async_playwright, Page, BrowserContext
 
 import config
@@ -52,7 +53,7 @@ async def download_setup(car: str, track: str) -> Path:
     async with async_playwright() as p:
         # headless=True en prod. Mettre False en local pour debugger Cloudflare.
         browser = await p.chromium.launch(
-            headless=False,
+            headless=config.HEADLESS,
             args=["--no-sandbox", "--disable-dev-shm-usage"],  # utile en VM/conteneur
         )
 
