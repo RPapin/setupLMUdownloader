@@ -53,9 +53,9 @@ client = LMUBot()
 # --- Autocomplétion des choix ---
 async def car_autocomplete(interaction: discord.Interaction, current: str):
     return [
-        app_commands.Choice(name=c, value=c)
+        app_commands.Choice(name=c["car"], value=c["car"])
         for c in combos.CARS
-        if current.lower() in c.lower()
+        if current.lower() in c["car"].lower()
     ][:25]
 
 
@@ -89,8 +89,12 @@ async def setup_command(interaction: discord.Interaction, voiture: str, circuit:
             )
             local_path = await hymo.download_setup(voiture, circuit)
 
-            # 3. Upload Drive (API synchrone -> exécuter dans un thread)
-            file = await asyncio.to_thread(gdrive.upload_file, local_path)
+            # 3. Upload Drive dans class_code/voiture/circuit
+            class_code = next(
+                (c["class_code"] for c in combos.CARS if c["car"] == voiture), "Unknown"
+            )
+            drive_path = f"{class_code}/{voiture}/{circuit}"
+            file = await asyncio.to_thread(gdrive.upload_file, local_path, drive_path)
             drive_link = file.get("webViewLink", "")
 
             # 4. Mise à jour du Sheet

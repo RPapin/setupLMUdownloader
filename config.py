@@ -5,7 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Charge le .env situé à côté de ce fichier
-load_dotenv(Path(__file__).parent / ".env")
+load_dotenv(Path(__file__).parent / ".env", encoding="utf-8")
 
 # --- Discord ---
 DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]

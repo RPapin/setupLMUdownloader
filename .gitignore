@@ -1,7 +1,6 @@
 # Secrets — NE JAMAIS COMMITTER
 .env
-credentials.json
-auth_state.json
+credentials/
 
 # Fichiers téléchargés
 downloads/

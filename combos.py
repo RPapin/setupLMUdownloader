@@ -1,33 +1,20 @@
 """
 Mapping des combos voiture/circuit.
-
-Deux usages possibles :
-- proposer des choix (autocomplétion) dans la commande Discord,
-- valider/normaliser ce que l'utilisateur saisit.
-
-TODO: remplir avec les vraies voitures/circuits de LMU disponibles sur
-hymosetups, ou basculer sur une recherche dynamique du site si la liste est
-trop grande / change souvent.
 """
 
 # Liste indicative — à compléter avec le contenu réel de LMU / hymosetups
-CARS = [
-    #LMGT3
-    "aston-martin-vantage-gt3-evo",
-    "bmw-m4-lmgt3",
-    "corvette-z06-gt3-r",
-    "mercedes-amg-lmgt3",
+CARS = [# LMGT3
+{ "car_hymo": "aston-martin-vantage-gt3-evo", "car_drive": "Aston Martin EVO", "class_code": "LMGT3"},
+{ "car_hymo": "bmw-m4-lmgt3", "car_drive": "BMW M4 GT3", "class_code": "LMGT3"},
+{ "car_hymo": "corvette-z06-gt3-r", "car_drive": "Corvette Z06 LMGT3", "class_code": "LMGT3"},
+{ "car_hymo": "mercedes-amg-lmgt3", "car_drive": "Mercedes AMG LMGT3", "class_code": "LMGT3"},
 ]
 
 TRACKS = [
-    "bahrain",
-    "circuit-de-barcelona",
-    "cota",
-    "lemans",
-    "Imola",
-    "Fuji",
-    "Sebring",
-    "Portimão",
+    { "track_hymo" : "bahrain", "track_drive" : "Bahrain"},
+    { "track_hymo" : "circuit-de-barcelona", "track_drive" : "Barcelona"},
+    { "track_hymo" : "cota", "track_drive" : "COTA"},
+    { "track_hymo" : "lemans", "track_drive" : "Le Mans"},
 ]
 
 

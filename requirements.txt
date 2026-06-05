@@ -1,6 +1,8 @@
-discord.py>=2.4
-playwright>=1.47
-python-dotenv>=1.0
-google-api-python-client>=2.140
-google-auth>=2.34
-gspread>=6.1
+# Python 3.14.5+
+discord.py>=2.7.1
+playwright>=1.60
+python-dotenv>=1.2.2
+google-api-python-client>=2.197
+google-auth>=2.53
+google-auth-oauthlib>=1.2
+gspread>=6.2.1
