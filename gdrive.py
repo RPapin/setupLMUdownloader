@@ -1,23 +1,18 @@
-"""Upload de fichiers vers un dossier Google Drive privé via compte de service."""
+"""Upload de fichiers vers un dossier Google Drive privé via OAuth2 utilisateur."""
 import logging
 from pathlib import Path
 
-from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 import config
+import google_auth
 
 logger = logging.getLogger(__name__)
 
-SCOPES = ["https://www.googleapis.com/auth/drive"]
-
 
 def _drive_service():
-    creds = Credentials.from_service_account_file(
-        config.GOOGLE_CREDENTIALS_PATH, scopes=SCOPES
-    )
-    return build("drive", "v3", credentials=creds)
+    return build("drive", "v3", credentials=google_auth.get_credentials())
 
 
 def _get_or_create_folder(service, name: str, parent_id: str) -> str:

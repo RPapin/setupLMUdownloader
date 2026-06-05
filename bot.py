@@ -53,17 +53,17 @@ client = LMUBot()
 # --- Autocomplétion des choix ---
 async def car_autocomplete(interaction: discord.Interaction, current: str):
     return [
-        app_commands.Choice(name=c["car"], value=c["car"])
+        app_commands.Choice(name=c["car_hymo"], value=c["car_hymo"])
         for c in combos.CARS
-        if current.lower() in c["car"].lower()
+        if current.lower() in c["car_hymo"].lower()
     ][:25]
 
 
 async def track_autocomplete(interaction: discord.Interaction, current: str):
     return [
-        app_commands.Choice(name=t, value=t)
+        app_commands.Choice(name=t["track_hymo"], value=t["track_hymo"])
         for t in combos.TRACKS
-        if current.lower() in t.lower()
+        if current.lower() in t["track_hymo"].lower()
     ][:25]
 
 
@@ -87,21 +87,26 @@ async def setup_command(interaction: discord.Interaction, voiture: str, circuit:
             await interaction.followup.send(
                 f"🔍 Recherche et téléchargement : **{voiture}** @ **{circuit}**..."
             )
-            local_path = await hymo.download_setup(voiture, circuit)
+            local_path, version_setup = await hymo.download_setup(voiture, circuit)
 
-            # 3. Upload Drive dans class_code/voiture/circuit
-            class_code = next(
-                (c["class_code"] for c in combos.CARS if c["car"] == voiture), "Unknown"
-            )
-            drive_path = f"{class_code}/{voiture}/{circuit}"
+            # 3. Upload Drive dans class_code/car_drive/track_drive
+            car_info = next((c for c in combos.CARS if c["car_hymo"] == voiture), {})
+            track_info = next((t for t in combos.TRACKS if t["track_hymo"] == circuit), {})
+            class_code = car_info.get("class_code", "Unknown")
+            car_drive = car_info.get("car_drive", voiture)
+            track_drive = track_info.get("track_drive", circuit)
+
+            drive_path = f"{class_code}/{car_drive}/{track_drive}"
             file = await asyncio.to_thread(gdrive.upload_file, local_path, drive_path)
             drive_link = file.get("webViewLink", "")
 
-            # 4. Mise à jour du Sheet
+            # 4. Mise à jour du Sheet (log + matrice)
             await asyncio.to_thread(
                 gsheet.add_entry,
-                voiture,
-                circuit,
+                car_drive,
+                track_drive,
+                version_setup,
+                class_code,
                 local_path.name,
                 drive_link,
                 str(interaction.user),
@@ -110,6 +115,7 @@ async def setup_command(interaction: discord.Interaction, voiture: str, circuit:
             # 5. Réponse finale
             await interaction.followup.send(
                 f"✅ Setup **{voiture}** @ **{circuit}** prêt !\n"
+                f"🏷️ Version : `{version_setup}`\n"
                 f"📄 `{local_path.name}`\n"
                 f"🔗 {drive_link}"
             )

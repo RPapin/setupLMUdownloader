@@ -4,8 +4,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Charge le .env situé à côté de ce fichier
-load_dotenv(Path(__file__).parent / ".env", encoding="utf-8")
+# BASE_DIR défini en premier car utilisé pour les chemins par défaut ci-dessous
+BASE_DIR = Path(__file__).parent
+CREDENTIAL_DIR = BASE_DIR / "credentials"
+
+load_dotenv(BASE_DIR / ".env", encoding="utf-8")
 
 # --- Discord ---
 DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
@@ -17,13 +20,15 @@ HYMO_PASS = os.environ["HYMO_PASS"]
 HYMO_BASE_URL = "https://www.hymosetups.com"
 HYMO_SETUP_URL = HYMO_BASE_URL + "/setups/le-mans-ultimate"
 
-# --- Google ---
-GOOGLE_CREDENTIALS_PATH = os.environ.get("GOOGLE_CREDENTIALS_PATH", "credentials.json")
+# --- Google OAuth2 ---
+# client_secrets.json : créer des credentials "Desktop app" dans Google Cloud Console
+GOOGLE_CLIENT_SECRETS_PATH = CREDENTIAL_DIR / "client_secret.json"
+
+GOOGLE_TOKEN_PATH = CREDENTIAL_DIR / "token.json" # token.json : généré au 1er `python google_auth.py`, à copier sur la VM ensuite
 DRIVE_FOLDER_ID = os.environ["DRIVE_FOLDER_ID"]
 SHEET_ID = os.environ["SHEET_ID"]
 
 # --- Chemins de travail ---
-BASE_DIR = Path(__file__).parent
 DOWNLOAD_DIR = BASE_DIR / "downloads"          # fichiers téléchargés (temporaire)
 AUTH_STATE_PATH = BASE_DIR / "auth_state.json"  # session Playwright persistée
 

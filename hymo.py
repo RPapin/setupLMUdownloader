@@ -4,6 +4,7 @@ Téléchargement de setups depuis hymosetups.com via Playwright.
 import asyncio
 import logging
 from pathlib import Path
+from time import sleep
 
 import dotenv
 from playwright.async_api import async_playwright, Page, BrowserContext
@@ -17,8 +18,6 @@ async def _ensure_logged_in(context: BrowserContext, page: Page) -> None:
     """Se connecte à hymosetups si la session restaurée n'est pas/plus valide."""
     await page.goto(config.HYMO_BASE_URL, wait_until="domcontentloaded")
 
-    # TODO: adapter ce test. Comment savoir si on est déjà loggé ?
-    #   -> ex. présence d'un bouton "Logout", d'un avatar, d'un lien "My account"
     already_logged = await page.locator("text=Logout").count() > 0
     if already_logged:
         logger.info("Session hymosetups déjà active.")
@@ -32,7 +31,7 @@ async def _ensure_logged_in(context: BrowserContext, page: Page) -> None:
     await page.fill('input[id="login-password"]', config.HYMO_PASS)
 
     await page.click('button[type="submit"]')
-
+    sleep(5)
     # Attendre la fin de la navigation post-login
     await page.wait_for_load_state("networkidle")
 
@@ -41,7 +40,7 @@ async def _ensure_logged_in(context: BrowserContext, page: Page) -> None:
     logger.info("Connexion réussie, session sauvegardée.")
 
 
-async def download_setup(car: str, track: str) -> Path:
+async def download_setup(car: str, track: str) -> tuple[Path, str]:
     """
     Télécharge le setup correspondant au combo voiture/circuit.
 
@@ -78,6 +77,10 @@ async def download_setup(car: str, track: str) -> Path:
             await _ensure_logged_in(context, page)
 
             await page.goto(config.HYMO_SETUP_URL + f"/{car}/{track}", wait_until="domcontentloaded")
+            # Ajout de la version
+            version = await page.locator("tbody tr:first-child td:nth-child(5)").inner_text()
+            version = version.lstrip("Vv")
+            #remove du v
             await page.locator('a[aria-label="Install setup"]').nth(1).click()
 
             async with page.expect_download() as download_info:
@@ -85,12 +88,11 @@ async def download_setup(car: str, track: str) -> Path:
             download = await download_info.value
 
             # Nom de fichier propre basé sur le combo
-            suggested = download.suggested_filename or f"{car}_{track}.zip"
-            dest = config.DOWNLOAD_DIR / suggested
+            dest = config.DOWNLOAD_DIR / f"{car}_{track}_V{version}.zip"
             await download.save_as(str(dest))
 
             logger.info("Setup téléchargé: %s", dest)
-            return dest
+            return dest, version
 
         finally:
             # IMPORTANT (RAM limitée) : toujours fermer le navigateur
