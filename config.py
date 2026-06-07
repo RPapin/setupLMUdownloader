@@ -20,6 +20,12 @@ HYMO_PASS = os.environ["HYMO_PASS"]
 HYMO_BASE_URL = "https://www.hymosetups.com"
 HYMO_SETUP_URL = HYMO_BASE_URL + "/setups/le-mans-ultimate"
 
+# --- TITAN (compte payant) ---
+TITAN_USER = os.environ["TITAN_USER"]
+TITAN_PASS = os.environ["TITAN_PASS"]
+TITAN_BASE_URL = "https://app.tracktitan.io"
+TITAN_SETUP_URL = TITAN_BASE_URL + "/setups/leMansUltimate?"
+
 # --- Google OAuth2 ---
 # client_secrets.json : créer des credentials "Desktop app" dans Google Cloud Console
 GOOGLE_CLIENT_SECRETS_PATH = CREDENTIAL_DIR / "client_secret.json"
@@ -30,7 +36,6 @@ SHEET_ID = os.environ["SHEET_ID"]
 
 # --- Chemins de travail ---
 DOWNLOAD_DIR = BASE_DIR / "downloads"          # fichiers téléchargés (temporaire)
-AUTH_STATE_PATH = BASE_DIR / "auth_state.json"  # session Playwright persistée
 
 DOWNLOAD_DIR.mkdir(exist_ok=True)
 

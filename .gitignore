@@ -16,5 +16,3 @@ __pycache__/
 .vscode/
 .idea/
 
-#Statut de connexion
-auth_state.json

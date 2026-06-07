@@ -10,8 +10,38 @@ import google_auth
 
 logger = logging.getLogger(__name__)
 
-LOG_HEADERS = ["Date", "Voiture", "Circuit", "Version", "Class", "Fichier", "Lien Drive", "Demandé par"]
-MATRIX_SHEET_NAME = "Matrix"
+LOG_HEADERS = ["Date", "Site", "Voiture", "Circuit", "Version", "Class", "Fichier", "Lien Drive", "Demandé par"]
+
+SITE_MATRIX_NAMES = {
+    "hymo": "Matrix Hymo",
+    "titan": "Matrix Titan",
+}
+
+
+def get_matrix_versions(site: str) -> dict[tuple[str, str], str]:
+    """
+    Lit la matrice du site et retourne {(car_drive, track_drive): version}
+    pour tous les setups déjà téléchargés (cellules non ❌).
+    """
+    sh = _open_spreadsheet()
+    sheet_name = SITE_MATRIX_NAMES[site]
+    try:
+        ws = sh.worksheet(sheet_name)
+    except gspread.WorksheetNotFound:
+        return {}
+
+    data = ws.get_all_values()
+    if len(data) < 2:
+        return {}
+
+    car_names = data[0][1:]
+    versions = {}
+    for row in data[1:]:
+        track_name = row[0]
+        for i, cell in enumerate(row[1:]):
+            if cell and cell != "❌" and i < len(car_names):
+                versions[(car_names[i], track_name)] = cell
+    return versions
 
 
 def _open_spreadsheet():
@@ -25,27 +55,26 @@ def _get_log_worksheet(sh):
     return ws
 
 
-def _get_or_create_matrix_sheet(sh):
-    """Retourne l'onglet Matrix, le crée et l'initialise avec ❌ si absent.
-    Applique le formatage (largeur colonnes + format texte) à chaque appel."""
+def _get_or_create_matrix_sheet(sh, site: str):
+    """Retourne l'onglet Matrix du site, le crée et l'initialise avec ❌ si absent."""
+    sheet_name = SITE_MATRIX_NAMES[site]
     car_names = [c["car_drive"] for c in combos.CARS]
     track_names = [t["track_drive"] for t in combos.TRACKS]
     n_cars, n_tracks = len(car_names), len(track_names)
 
     try:
-        ws = sh.worksheet(MATRIX_SHEET_NAME)
+        ws = sh.worksheet(sheet_name)
     except gspread.WorksheetNotFound:
         ws = sh.add_worksheet(
-            title=MATRIX_SHEET_NAME,
+            title=sheet_name,
             rows=n_tracks + 1,
             cols=n_cars + 1,
         )
         headers = [""] + car_names
         rows = [[name] + ["❌"] * n_cars for name in track_names]
         ws.update([headers] + rows)
-        logger.info("Onglet Matrix créé (%d voitures × %d circuits)", n_cars, n_tracks)
+        logger.info("Onglet '%s' créé (%d voitures × %d circuits)", sheet_name, n_cars, n_tracks)
 
-    # Largeur des colonnes (150 px) — idempotent
     sh.batch_update({"requests": [{
         "updateDimensionProperties": {
             "range": {
@@ -59,24 +88,23 @@ def _get_or_create_matrix_sheet(sh):
         }
     }]})
 
-    # Format texte sur tout l'onglet pour éviter l'interprétation en date
-    ws.format("A1:Z1000", {"numberFormat": {"type": "TEXT"}})
-
     return ws
 
 
-def _update_matrix_cell(ws, car_drive: str, track_drive: str, version: str) -> None:
+def _update_matrix_cell(ws, car_drive: str, track_drive: str, version: str, drive_link: str) -> None:
     car_names = [c["car_drive"] for c in combos.CARS]
     track_names = [t["track_drive"] for t in combos.TRACKS]
 
     try:
-        col = car_names.index(car_drive) + 2    # +1 colonne tracks, +1 base 1
-        row = track_names.index(track_drive) + 2  # +1 ligne header, +1 base 1
+        col = car_names.index(car_drive) + 2
+        row = track_names.index(track_drive) + 2
     except ValueError:
         logger.warning("Combo introuvable dans la matrice : %s / %s", car_drive, track_drive)
         return
 
-    ws.update_cell(row, col, version)
+    cell = gspread.utils.rowcol_to_a1(row, col)
+    formula = f'=HYPERLINK("{drive_link}";"{version}")'
+    ws.update([[formula]], cell, value_input_option="USER_ENTERED")
     logger.info("Matrice mise à jour : %s / %s → %s", car_drive, track_drive, version)
 
 
@@ -88,20 +116,21 @@ def add_entry(
     filename: str,
     drive_link: str,
     requested_by: str = "",
+    site: str = "hymo",
 ) -> None:
-    """Ajoute une ligne au log (sheet1) et met à jour la cellule de la matrice."""
+    """Ajoute une ligne au log (sheet1) et met à jour la cellule de la matrice du site."""
     sh = _open_spreadsheet()
 
     ws_log = _get_log_worksheet(sh)
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     ws_log.append_row(
-        [now, car_drive, track_drive, version, class_code, filename, drive_link, requested_by],
+        [now, site, car_drive, track_drive, version, class_code, filename, drive_link, requested_by],
         value_input_option="USER_ENTERED",
     )
-    logger.info("Ligne ajoutée au Sheet: %s / %s", car_drive, track_drive)
+    logger.info("Ligne ajoutée au Sheet: %s / %s [%s]", car_drive, track_drive, site)
 
-    ws_matrix = _get_or_create_matrix_sheet(sh)
-    _update_matrix_cell(ws_matrix, car_drive, track_drive, version)
+    ws_matrix = _get_or_create_matrix_sheet(sh, site)
+    _update_matrix_cell(ws_matrix, car_drive, track_drive, version, drive_link)
 
 
 # Test manuel : `python gsheet.py`
@@ -115,5 +144,6 @@ if __name__ == "__main__":
         filename="test.zip",
         drive_link="https://drive.google.com/file/d/test",
         requested_by="test",
+        site="hymo",
     )
     print("Test OK.")

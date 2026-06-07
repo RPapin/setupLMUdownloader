@@ -3,16 +3,17 @@
 ## Objectif du projet
 
 Bot Discord qui automatise le téléchargement de setups payants pour le jeu
-**Le Mans Ultimate (LMU)** depuis hymosetups.com, puis les archive et les répertorie.
+**Le Mans Ultimate (LMU)** depuis **hymosetups.com** ou **app.tracktitan.io**,
+puis les archive et les répertorie.
 
 Workflow déclenché par une commande slash Discord `/setup` :
 
-1. **Sélection** d'un combo voiture/circuit (depuis Discord).
-2. **Téléchargement** du setup correspondant depuis https://www.hymosetups.com/
-   (compte payant — le site est protégé par **Cloudflare**).
+1. **Sélection** du site source (Hymo Setups / Track Titan), d'une voiture et d'un circuit.
+2. **Téléchargement** du setup correspondant via le site choisi
+   (comptes payants — les sites sont protégés par **Cloudflare**).
 3. **Upload** du fichier sur un dossier Google Drive privé.
 4. **Mise à jour** d'un Google Sheet servant de tableau de suivi des setups
-   téléchargés.
+   téléchargés (une matrice par site : "Matrix Hymo" et "Matrix Titan").
 
 ## Contrainte technique majeure : Cloudflare
 
@@ -30,9 +31,7 @@ porte les cookies `cf_clearance` / session).
 - Lancer Chromium en mode le moins détectable possible (pas de flags
   d'automatisation criards). Envisager `playwright-stealth` si le challenge
   bloque le headless. Tester d'abord en `headless=False` en local.
-- Réutiliser un **storage_state** (cookies + localStorage) sauvegardé après un
-  premier login réussi, pour éviter de relogger à chaque fois et limiter les
-  challenges. Voir `auth_state.json`.
+- Login systématique à chaque session avec les identifiants `.env` — pas de storage_state persisté.
 - Sur la VM (headless, IP datacenter), Cloudflare peut être plus agressif qu'en
   local. Prévoir un fallback / retry et logguer les pages de challenge.
 
@@ -66,8 +65,7 @@ La VM n'a qu'1 Go de RAM. Chromium est gourmand :
 
 - Secrets via **variables d'environnement** (fichier `.env` en local, chargé
   avec `python-dotenv`). Sur la VM, `.env` ou variables systemd.
-- Ne **JAMAIS committer** : `.env`, `credentials.json`, `auth_state.json`,
-  `venv/`, fichiers téléchargés. (Voir `.gitignore`.)
+- Ne **JAMAIS committer** : `.env`, `credentials.json`, `venv/`, fichiers téléchargés. (Voir `.gitignore`.)
 - Utiliser `pathlib`/`os.path` pour les chemins (compat Windows/Linux).
 - Logguer proprement (module `logging`), pas de `print` en prod.
 - Code asynchrone (discord.py et Playwright async API).
@@ -85,6 +83,8 @@ DISCORD_TOKEN=          # token du bot (DEV ou PROD selon l'environnement)
 DISCORD_GUILD_ID=       # (optionnel) ID du serveur pour sync rapide des slash commands
 HYMO_USER=              # email du compte hymosetups payant
 HYMO_PASS=              # mot de passe hymosetups
+TITAN_USER=             # email du compte tracktitan payant
+TITAN_PASS=             # mot de passe tracktitan
 GOOGLE_CREDENTIALS_PATH=credentials.json   # chemin du JSON service account
 DRIVE_FOLDER_ID=        # ID du dossier Drive privé cible
 SHEET_ID=               # ID du Google Sheet de suivi
@@ -94,18 +94,19 @@ SHEET_ID=               # ID du Google Sheet de suivi
 
 ```
 lmu-bot/
-├─ CLAUDE.md             # ce fichier (contexte projet)
-├─ bot.py                # point d'entrée : bot Discord + commandes slash
-├─ hymo.py               # scraping/download hymosetups via Playwright
-├─ gdrive.py             # upload Google Drive
-├─ gsheet.py             # mise à jour du Google Sheet
-├─ combos.py             # mapping combos voiture/circuit -> infos de recherche
-├─ config.py             # chargement des variables d'env
+├─ CLAUDE.md                  # ce fichier (contexte projet)
+├─ bot.py                     # point d'entrée : bot Discord + commandes slash
+├─ hymo.py                    # scraping/download hymosetups via Playwright
+├─ titan.py                   # scraping/download tracktitan via Playwright
+├─ gdrive.py                  # upload Google Drive
+├─ gsheet.py                  # mise à jour du Google Sheet (2 onglets Matrix)
+├─ combos.py                  # mapping combos voiture/circuit -> infos de recherche
+├─ config.py                  # chargement des variables d'env
 ├─ requirements.txt
 ├─ .gitignore
-├─ .env                  # NON commité — à créer manuellement
-├─ credentials.json      # NON commité — service account Google
-└─ auth_state.json       # NON commité — cookies/session Playwright sauvegardés
+├─ .env                       # NON commité — à créer manuellement
+├─ credentials.json           # NON commité — service account Google
+└─ downloads/                 # NON commité — setups téléchargés temporairement
 ```
 
 ## État d'avancement / TODO
