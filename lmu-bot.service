@@ -15,10 +15,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-# TODO: remplacer par ton user Linux GCP (résultat de `whoami`)
-User=CHANGE_ME
-WorkingDirectory=/home/CHANGE_ME/lmu-bot
-ExecStart=/home/CHANGE_ME/lmu-bot/venv/bin/python /home/CHANGE_ME/lmu-bot/bot.py
+User=rmppn6
+WorkingDirectory=/home/rmppn6/setupLMUdownloader
+ExecStart=/home/rmppn6/setupLMUdownloader/venv/bin/python /home/rmppn6/setupLMUdownloader/bot.py
 Restart=always
 RestartSec=10
 
