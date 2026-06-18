@@ -32,6 +32,16 @@ def _extract_version_from_zip(zip_path: Path) -> str:
     return match.group(1)
 
 
+async def _screenshot_on_error(page: Page, name: str) -> None:
+    """Sauvegarde un screenshot dans DOWNLOAD_DIR pour diagnostiquer les blocages."""
+    try:
+        dest = config.DOWNLOAD_DIR / f"debug_{name}.png"
+        await page.screenshot(path=str(dest), full_page=True)
+        logger.error("Screenshot sauvegardé : %s", dest)
+    except Exception:
+        pass
+
+
 async def _dismiss_welcome_modal(page: Page) -> None:
     """Ferme la modale 'Herzlich Willkommen' si elle est présente après login."""
     modal = page.locator('[class*="ModalContent"]')
@@ -48,6 +58,15 @@ async def _login(page: Page) -> None:
     """Se connecte à tracktitan avec les identifiants configurés."""
     logger.info("Connexion à tracktitan...")
     await page.goto(f"{config.TITAN_BASE_URL}/login", wait_until="domcontentloaded")
+    logger.info("Page login chargée : title=%r url=%s", await page.title(), page.url)
+    try:
+        await page.wait_for_selector('input[id="email"]', timeout=15_000)
+    except Exception:
+        await _screenshot_on_error(page, "titan_login")
+        raise RuntimeError(
+            f"Champ email introuvable sur la page de login (Cloudflare ?) — "
+            f"title={await page.title()!r} url={page.url}"
+        )
     await page.fill('input[id="email"]', config.TITAN_USER)
     await page.fill('input[id="password"]', config.TITAN_PASS)
     await page.click('button[type="submit"]')
@@ -70,7 +89,11 @@ async def download_setup(car: str, track: str, current_version: str | None = Non
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=config.HEADLESS,
-            args=["--no-sandbox", "--disable-dev-shm-usage"],
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled",
+            ],
         )
         context = await browser.new_context(
             accept_downloads=True,
@@ -78,6 +101,11 @@ async def download_setup(car: str, track: str, current_version: str | None = Non
                 "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
                 "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
             ),
+            viewport={"width": 1280, "height": 800},
+        )
+        # Masque navigator.webdriver pour réduire la détection Cloudflare
+        await context.add_init_script(
+            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
         )
         page = await context.new_page()
 
@@ -111,7 +139,7 @@ async def download_setup(car: str, track: str, current_version: str | None = Non
                 tmp_dest.unlink(missing_ok=True)
                 return None, version
 
-            dest = config.DOWNLOAD_DIR / f"{car}_{track}_V{version}.zip"
+            dest = config.DOWNLOAD_DIR / f"hymo_{car}_{track}_V{version}.zip"
             tmp_dest.rename(dest)
 
             logger.info("Setup téléchargé: %s", dest)

@@ -33,7 +33,7 @@ _download_lock = asyncio.Lock()
 
 SITES = [
     # app_commands.Choice(name="Hymo Setups", value="hymo"),
-    app_commands.Choice(name="Track Titan", value="titan"),
+    app_commands.Choice(name="Track Titan (HYMO)", value="titan"),
     app_commands.Choice(name="GoSetup", value="gosetup"),
 ]
 
