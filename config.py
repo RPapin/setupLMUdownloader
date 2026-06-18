@@ -26,6 +26,12 @@ TITAN_PASS = os.environ["TITAN_PASS"]
 TITAN_BASE_URL = "https://app.tracktitan.io"
 TITAN_SETUP_URL = TITAN_BASE_URL + "/setups/leMansUltimate?"
 
+# --- GoSetup (compte payant) ---
+GOSETUP_USER = os.environ["GOSETUP_USER_1"]
+GOSETUP_PASS = os.environ["GOSETUP_PASS_1"]
+GOSETUP_BASE_URL = "https://gosetups.gg"
+GOSETUP_SETUP_URL = GOSETUP_BASE_URL + "/my-account/downloads/?"
+
 # --- Google OAuth2 ---
 # client_secrets.json : créer des credentials "Desktop app" dans Google Cloud Console
 GOOGLE_CLIENT_SECRETS_PATH = CREDENTIAL_DIR / "client_secret.json"

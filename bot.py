@@ -18,6 +18,7 @@ import config
 import combos
 import hymo
 import titan
+import gosetup
 import gdrive
 import gsheet
 
@@ -31,8 +32,9 @@ logger = logging.getLogger("lmu-bot")
 _download_lock = asyncio.Lock()
 
 SITES = [
-    app_commands.Choice(name="Hymo Setups", value="hymo"),
+    # app_commands.Choice(name="Hymo Setups", value="hymo"),
     app_commands.Choice(name="Track Titan", value="titan"),
+    app_commands.Choice(name="GoSetup", value="gosetup"),
 ]
 
 
@@ -108,6 +110,10 @@ async def setup_command(
                 car_id = car_info["car_hymo"]
                 track_id = track_info["track_hymo"]
                 downloader = hymo.download_setup
+            elif site_value == "gosetup":
+                car_id = car_info["car_gosetup"]
+                track_id = track_info["track_gosetup"]
+                downloader = gosetup.download_setup
             else:
                 car_id = car_info["car_titan"]
                 track_id = track_info["track_titan"]
@@ -123,14 +129,19 @@ async def setup_command(
             local_path, version_setup = await downloader(
                 car_id, track_id, current_version=current_version
             )
-
+            # If the setup is already in the drive we return the link of the setup
             if local_path is None:
-                await interaction.followup.send(
+                matrix_links = await asyncio.to_thread(gsheet.get_matrix_links, site_value)
+                existing_link = matrix_links.get((car_drive, track_drive), "")
+                msg = (
                     f"✅ Setup **{car_drive}** @ **{track_drive}** déjà à jour "
                     f"(version `{version_setup}`) sur **{site.name}**."
                 )
+                if existing_link:
+                    msg += f"\n🔗 {existing_link}"
+                await interaction.followup.send(msg)
                 return
-
+            # else we add the link to the drive
             drive_path = f"{class_code}/{car_drive}/{track_drive}"
             file = await asyncio.to_thread(gdrive.upload_file, local_path, drive_path)
             drive_link = file.get("webViewLink", "")

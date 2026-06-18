@@ -1,8 +1,10 @@
 """Mise à jour du Google Sheet de suivi des setups téléchargés."""
 import logging
+import re
 from datetime import datetime, timezone
 
 import gspread
+from gspread.utils import ValueRenderOption
 
 import combos
 import config
@@ -15,6 +17,7 @@ LOG_HEADERS = ["Date", "Site", "Voiture", "Circuit", "Version", "Class", "Fichie
 SITE_MATRIX_NAMES = {
     "hymo": "Matrix Hymo",
     "titan": "Matrix Titan",
+    "gosetup": "Matrix GoSetup",
 }
 
 
@@ -42,6 +45,34 @@ def get_matrix_versions(site: str) -> dict[tuple[str, str], str]:
             if cell and cell != "❌" and i < len(car_names):
                 versions[(car_names[i], track_name)] = cell
     return versions
+
+
+def get_matrix_links(site: str) -> dict[tuple[str, str], str]:
+    """
+    Lit la matrice du site et retourne {(car_drive, track_drive): drive_link}
+    en parsant les formules =HYPERLINK("url";"version") stockées dans les cellules.
+    """
+    sh = _open_spreadsheet()
+    sheet_name = SITE_MATRIX_NAMES[site]
+    try:
+        ws = sh.worksheet(sheet_name)
+    except gspread.WorksheetNotFound:
+        return {}
+
+    data = ws.get_all_values(value_render_option=ValueRenderOption.formula)
+    if len(data) < 2:
+        return {}
+
+    car_names = data[0][1:]
+    links = {}
+    for row in data[1:]:
+        track_name = row[0]
+        for i, cell in enumerate(row[1:]):
+            if cell and cell != "❌" and i < len(car_names):
+                match = re.search(r'HYPERLINK\("([^"]+)"', cell)
+                if match:
+                    links[(car_names[i], track_name)] = match.group(1)
+    return links
 
 
 def _open_spreadsheet():

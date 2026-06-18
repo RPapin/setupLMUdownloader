@@ -3,17 +3,17 @@
 ## Objectif du projet
 
 Bot Discord qui automatise le téléchargement de setups payants pour le jeu
-**Le Mans Ultimate (LMU)** depuis **hymosetups.com** ou **app.tracktitan.io**,
-puis les archive et les répertorie.
+**Le Mans Ultimate (LMU)** depuis **hymosetups.com**, **app.tracktitan.io** ou
+**gosetup.com**, puis les archive et les répertorie.
 
 Workflow déclenché par une commande slash Discord `/setup` :
 
-1. **Sélection** du site source (Hymo Setups / Track Titan), d'une voiture et d'un circuit.
+1. **Sélection** du site source (Hymo Setups / Track Titan / GoSetup), d'une voiture et d'un circuit.
 2. **Téléchargement** du setup correspondant via le site choisi
    (comptes payants — les sites sont protégés par **Cloudflare**).
 3. **Upload** du fichier sur un dossier Google Drive privé.
 4. **Mise à jour** d'un Google Sheet servant de tableau de suivi des setups
-   téléchargés (une matrice par site : "Matrix Hymo" et "Matrix Titan").
+   téléchargés (une matrice par site : "Matrix Hymo", "Matrix Titan" et "Matrix GoSetup").
 
 ## Contrainte technique majeure : Cloudflare
 
@@ -85,6 +85,8 @@ HYMO_USER=              # email du compte hymosetups payant
 HYMO_PASS=              # mot de passe hymosetups
 TITAN_USER=             # email du compte tracktitan payant
 TITAN_PASS=             # mot de passe tracktitan
+GOSETUP_USER=           # email du compte gosetup payant
+GOSETUP_PASS=           # mot de passe gosetup
 GOOGLE_CREDENTIALS_PATH=credentials.json   # chemin du JSON service account
 DRIVE_FOLDER_ID=        # ID du dossier Drive privé cible
 SHEET_ID=               # ID du Google Sheet de suivi
@@ -98,6 +100,7 @@ lmu-bot/
 ├─ bot.py                     # point d'entrée : bot Discord + commandes slash
 ├─ hymo.py                    # scraping/download hymosetups via Playwright
 ├─ titan.py                   # scraping/download tracktitan via Playwright
+├─ gosetup.py                 # scraping/download gosetup via Playwright (sélecteurs TODO)
 ├─ gdrive.py                  # upload Google Drive
 ├─ gsheet.py                  # mise à jour du Google Sheet (2 onglets Matrix)
 ├─ combos.py                  # mapping combos voiture/circuit -> infos de recherche
@@ -114,6 +117,10 @@ lmu-bot/
 - [ ] **CRITIQUE** : finaliser `hymo.py` — les sélecteurs CSS (login, champ
       recherche, bouton download) sont des **placeholders** à remplacer après
       inspection réelle du site avec les DevTools. Voir les `TODO` dans le code.
+- [ ] **CRITIQUE** : finaliser `gosetup.py` — tous les sélecteurs CSS sont des
+      **placeholders** (`TODO_VERSION_SELECTOR`, `TODO_DOWNLOAD_BUTTON_SELECTOR`,
+      URL de login, etc.). Inspecter le site avec les DevTools et compléter.
+      Valider aussi les slugs `car_gosetup` / `track_gosetup` dans `combos.py`.
 - [ ] Valider le passage de Cloudflare en headless sur la VM (tester stealth).
 - [ ] Définir la vraie structure des combos voiture/circuit dans `combos.py`
       (liste réelle ou recherche dynamique sur le site).
