@@ -32,6 +32,18 @@ def _extract_version_from_zip(zip_path: Path) -> str:
     return match.group(1)
 
 
+async def _dismiss_welcome_modal(page: Page) -> None:
+    """Ferme la modale 'Herzlich Willkommen' si elle est présente après login."""
+    modal = page.locator('[class*="ModalContent"]')
+    try:
+        await modal.wait_for(timeout=3_000)
+        close_btn = modal.locator('button[type="button"]')
+        await close_btn.click()
+        logger.info("Modale de bienvenue fermée.")
+    except Exception:
+        pass  # modale absente, rien à faire
+
+
 async def _login(page: Page) -> None:
     """Se connecte à tracktitan avec les identifiants configurés."""
     logger.info("Connexion à tracktitan...")
@@ -40,6 +52,7 @@ async def _login(page: Page) -> None:
     await page.fill('input[id="password"]', config.TITAN_PASS)
     await page.click('button[type="submit"]')
     await page.wait_for_load_state("networkidle")
+    await _dismiss_welcome_modal(page)
     logger.info("Connexion tracktitan réussie.")
 
 
