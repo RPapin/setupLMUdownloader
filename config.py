@@ -26,17 +26,22 @@ TITAN_PASS = os.environ["TITAN_PASS"]
 TITAN_BASE_URL = "https://app.tracktitan.io"
 TITAN_SETUP_URL = TITAN_BASE_URL + "/setups/leMansUltimate?"
 
-# --- GoSetup (compte payant) ---
-GOSETUP_USER = os.environ["GOSETUP_USER_1"]
-GOSETUP_PASS = os.environ["GOSETUP_PASS_1"]
+# --- GoSetup (comptes payants — rotation pour économiser les crédits) ---
 GOSETUP_BASE_URL = "https://gosetups.gg"
 GOSETUP_SETUP_URL = GOSETUP_BASE_URL + "/my-account/downloads/?"
+GOSETUP_ACCOUNTS: list[tuple[str, str]] = [
+    (os.environ["GOSETUP_USER_1"], os.environ["GOSETUP_PASS_1"]),
+]
+if os.environ.get("GOSETUP_USER_2") and os.environ.get("GOSETUP_PASS_2"):
+    GOSETUP_ACCOUNTS.append((os.environ["GOSETUP_USER_2"], os.environ["GOSETUP_PASS_2"]))
+if os.environ.get("GOSETUP_USER_3") and os.environ.get("GOSETUP_PASS_3"):
+    GOSETUP_ACCOUNTS.append((os.environ["GOSETUP_USER_3"], os.environ["GOSETUP_PASS_3"]))
 
 # --- Google OAuth2 ---
 # client_secrets.json : créer des credentials "Desktop app" dans Google Cloud Console
 GOOGLE_CLIENT_SECRETS_PATH = CREDENTIAL_DIR / "client_secret.json"
 
-GOOGLE_TOKEN_PATH = Path(os.environ["GOOGLE_CREDENTIALS_PATH"]) # token.json : généré au 1er `python google_auth.py`, à copier sur la VM ensuite
+GOOGLE_TOKEN_PATH = Path(os.environ["GOOGLE_CREDENTIALS_PATH"]) # token-google-rempap.json : généré au 1er `python google_auth.py`, à copier sur la VM ensuite
 DRIVE_FOLDER_ID = os.environ["DRIVE_FOLDER_ID"]
 SHEET_ID = os.environ["SHEET_ID"]
 

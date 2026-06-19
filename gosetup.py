@@ -11,13 +11,22 @@ import config
 
 logger = logging.getLogger(__name__)
 
+# Rotation entre les comptes GoSetup pour économiser les crédits
+_account_index = 0
 
-async def _login(page: Page) -> None:
-    """Se connecte à GoSetup avec les identifiants configurés."""
-    logger.info("Connexion à GoSetup...")
+
+def _next_account() -> tuple[str, str]:
+    global _account_index
+    account = config.GOSETUP_ACCOUNTS[_account_index % len(config.GOSETUP_ACCOUNTS)]
+    _account_index += 1
+    return account
+
+
+async def _login(page: Page, user: str, password: str) -> None:
+    logger.info("Connexion à GoSetup (compte %s)...", user)
     await page.goto(f"{config.GOSETUP_BASE_URL}/my-account/downloads/", wait_until="domcontentloaded")
-    await page.fill('input[name="username"]', config.GOSETUP_USER)
-    await page.fill('input[name="password"]', config.GOSETUP_PASS)
+    await page.fill('input[name="username"]', user)
+    await page.fill('input[name="password"]', password)
     await page.click('button[type="submit"]')
     await page.wait_for_load_state("networkidle")
     logger.info("Connexion GoSetup réussie.")
@@ -34,6 +43,8 @@ async def download_setup(car: str, track: str, current_version: str | None = Non
     """
     logger.info("Téléchargement setup GoSetup: car=%s track=%s", car, track)
 
+    user, password = _next_account()
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=config.HEADLESS,
@@ -49,7 +60,7 @@ async def download_setup(car: str, track: str, current_version: str | None = Non
         page = await context.new_page()
 
         try:
-            await _login(page)
+            await _login(page, user, password)
 
             await page.goto(config.GOSETUP_SETUP_URL + f"brx_d3ee75={car}&brx_e8e98e={track}", wait_until="domcontentloaded")
 
