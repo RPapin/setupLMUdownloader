@@ -34,12 +34,12 @@ def get_matrix_versions(site: str) -> dict[tuple[str, str], str]:
         return {}
 
     data = ws.get_all_values()
-    if len(data) < 2:
+    if len(data) < 3:
         return {}
 
-    car_names = data[0][1:]
+    car_names = data[1][1:]  # row 1 = class header, row 2 = car names
     versions = {}
-    for row in data[1:]:
+    for row in data[2:]:
         track_name = row[0]
         for i, cell in enumerate(row[1:]):
             if cell and cell != "❌" and i < len(car_names):
@@ -60,12 +60,12 @@ def get_matrix_links(site: str) -> dict[tuple[str, str], str]:
         return {}
 
     data = ws.get_all_values(value_render_option=ValueRenderOption.formula)
-    if len(data) < 2:
+    if len(data) < 3:
         return {}
 
-    car_names = data[0][1:]
+    car_names = data[1][1:]  # row 1 = class header, row 2 = car names
     links = {}
-    for row in data[1:]:
+    for row in data[2:]:
         track_name = row[0]
         for i, cell in enumerate(row[1:]):
             if cell and cell != "❌" and i < len(car_names):
@@ -98,13 +98,67 @@ def _get_or_create_matrix_sheet(sh, site: str):
     except gspread.WorksheetNotFound:
         ws = sh.add_worksheet(
             title=sheet_name,
-            rows=n_tracks + 1,
+            rows=n_tracks + 2,
             cols=n_cars + 1,
         )
-        headers = [""] + car_names
-        rows = [[name] + ["❌"] * n_cars for name in track_names]
-        ws.update([headers] + rows)
+
+        # Row 1: class code on first car of each group, empty for the rest
+        class_header = [""]
+        current_class = None
+        for car in combos.CARS:
+            if car["class_code"] != current_class:
+                class_header.append(car["class_code"])
+                current_class = car["class_code"]
+            else:
+                class_header.append("")
+
+        car_header = [""] + car_names
+        data_rows = [[name] + ["❌"] * n_cars for name in track_names]
+        ws.update([class_header, car_header] + data_rows)
         logger.info("Onglet '%s' créé (%d voitures × %d circuits)", sheet_name, n_cars, n_tracks)
+
+        # Merge class header cells across each class group
+        merge_requests = []
+        class_start_col = None
+        current_class = None
+        for i, car in enumerate(combos.CARS):
+            if car["class_code"] != current_class:
+                if current_class is not None:
+                    end_col = i + 1  # car i is at column i+1 (col 0 = track names)
+                    if end_col - class_start_col > 1:
+                        merge_requests.append({
+                            "mergeCells": {
+                                "range": {
+                                    "sheetId": ws.id,
+                                    "startRowIndex": 0,
+                                    "endRowIndex": 1,
+                                    "startColumnIndex": class_start_col,
+                                    "endColumnIndex": end_col,
+                                },
+                                "mergeType": "MERGE_ALL",
+                            }
+                        })
+                current_class = car["class_code"]
+                class_start_col = i + 1
+
+        # Last class group
+        end_col = n_cars + 1
+        if current_class is not None and end_col - class_start_col > 1:
+            merge_requests.append({
+                "mergeCells": {
+                    "range": {
+                        "sheetId": ws.id,
+                        "startRowIndex": 0,
+                        "endRowIndex": 1,
+                        "startColumnIndex": class_start_col,
+                        "endColumnIndex": end_col,
+                    },
+                    "mergeType": "MERGE_ALL",
+                }
+            })
+
+        if merge_requests:
+            sh.batch_update({"requests": merge_requests})
 
     sh.batch_update({"requests": [{
         "updateDimensionProperties": {
@@ -128,7 +182,7 @@ def _update_matrix_cell(ws, car_drive: str, track_drive: str, version: str, driv
 
     try:
         col = car_names.index(car_drive) + 2
-        row = track_names.index(track_drive) + 2
+        row = track_names.index(track_drive) + 3  # +3: row1=class, row2=cars, row3+=data
     except ValueError:
         logger.warning("Combo introuvable dans la matrice : %s / %s", car_drive, track_drive)
         return

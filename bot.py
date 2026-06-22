@@ -58,9 +58,9 @@ client = LMUBot()
 
 async def car_autocomplete(interaction: discord.Interaction, current: str):
     return [
-        app_commands.Choice(name=c["car_drive"], value=c["car_drive"])
+        app_commands.Choice(name=f"[{c['class_code']}] {c['car_drive']}", value=c["car_drive"])
         for c in combos.CARS
-        if current.lower() in c["car_drive"].lower()
+        if current.lower() in c["car_drive"].lower() or current.lower() in c["class_code"].lower()
     ][:25]
 
 
