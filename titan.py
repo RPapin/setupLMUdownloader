@@ -6,6 +6,7 @@ import logging
 import re
 import zipfile
 from pathlib import Path
+from time import sleep
 
 from playwright.async_api import async_playwright, Page
 
@@ -43,15 +44,26 @@ async def _screenshot_on_error(page: Page, name: str) -> None:
 
 
 async def _dismiss_welcome_modal(page: Page) -> None:
-    """Ferme la modale 'Herzlich Willkommen' si elle est présente après login."""
+    """Ferme toute modale ouverte (ModalContent ou HeadlessUI portal)."""
+    # Tentative 1 : modale custom avec classe ModalContent
     modal = page.locator('[class*="ModalContent"]')
     try:
-        await modal.wait_for(timeout=3_000)
+        await modal.wait_for(timeout=2_000)
         close_btn = modal.locator('button[type="button"]')
         await close_btn.click()
-        logger.info("Modale de bienvenue fermée.")
+        logger.info("Modale ModalContent fermée.")
     except Exception:
-        pass  # modale absente, rien à faire
+        pass
+
+    # Tentative 2 : overlay HeadlessUI (headlessui-dialog-overlay)
+    overlay = page.locator('#headlessui-portal-root [id^="headlessui-dialog-overlay"]')
+    try:
+        await overlay.wait_for(state="visible", timeout=2_000)
+        await page.keyboard.press("Escape")
+        await overlay.wait_for(state="hidden", timeout=3_000)
+        logger.info("Modale HeadlessUI fermée via Escape.")
+    except Exception:
+        pass
 
 
 async def _login(page: Page) -> None:
@@ -123,6 +135,7 @@ async def download_setup(car: str, track: str, current_version: str | None = Non
             logger.info("%d carte(s) subscription trouvée(s) pour %s / %s", count, car, track)
             if count == 0:
                 raise RuntimeError(f"Aucune carte 'Included in Subscription' trouvée ({car} / {track})")
+            await _dismiss_welcome_modal(page)
             await locator.first.click()
 
             async with page.expect_download() as download_info:
