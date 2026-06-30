@@ -147,9 +147,22 @@ async def download_setup(car: str, track: str, current_version: str | None = Non
                 raise RuntimeError(f"Aucune carte 'Included in Subscription' trouvée ({car} / {track})")
             await _dismiss_welcome_modal(page)
             await locator.first.click()
+            await page.wait_for_load_state("domcontentloaded")
+            await _dismiss_welcome_modal(page)
+
+            dl_btn = page.get_by_role("button", name="Télécharger la dernière version")
+
+            try:
+                await dl_btn.wait_for(state="visible", timeout=20_000)
+            except Exception:
+                await _screenshot_on_error(page, "titan_download_btn")
+                raise RuntimeError(
+                    f"Bouton 'Download Latest Version' introuvable — "
+                    f"title={await page.title()!r} url={page.url}"
+                )
 
             async with page.expect_download() as download_info:
-                await page.get_by_role("button", name="Download Latest Version").click()
+                await dl_btn.click()
             download = await download_info.value
 
             tmp_dest = config.DOWNLOAD_DIR / f"{car}_{track}.zip"
