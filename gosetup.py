@@ -39,10 +39,50 @@ async def _select_filter(page: Page, select_id: str, value: str) -> None:
     (dropdown JS `.go-dd` qui wrap un <select> caché ; les options réelles
     sont des <div class="go-dd__option" data-value="...">, cliquer sur le
     <select> ne suffit pas car le JS du site écoute les clics sur ces divs).
+
+    La liste d'options est scrollable et certaines valeurs ne sont pas
+    visibles/rendues tant qu'on n'a pas scrollé jusqu'à elles : on scrolle
+    donc le conteneur par petits pas jusqu'à trouver l'option recherchée.
     """
     field = page.locator(f'div.gos-sd-filter-field:has(label[for="{select_id}"])')
     await field.locator(".go-dd__trigger").click()
-    await field.locator(f'.go-dd__option[data-value="{value}"]').click()
+
+    options_container = field.locator(".go-dd__options")
+    target_option = field.locator(f'.go-dd__option[data-value="{value}"]')
+
+    async def _in_view() -> bool:
+        if await target_option.count() == 0:
+            return False
+        option_box = await target_option.bounding_box()
+        container_box = await options_container.bounding_box()
+        if not option_box or not container_box:
+            return False
+        return (
+            option_box["y"] >= container_box["y"]
+            and option_box["y"] + option_box["height"] <= container_box["y"] + container_box["height"]
+        )
+
+    max_scrolls = 30
+    for _ in range(max_scrolls):
+        if await _in_view():
+            break
+
+        at_bottom = await options_container.evaluate(
+            "el => el.scrollTop + el.clientHeight >= el.scrollHeight - 1"
+        )
+        if at_bottom:
+            break
+
+        await options_container.evaluate("el => el.scrollBy(0, el.clientHeight / 2)")
+        await page.wait_for_timeout(100)
+
+    if await target_option.count() == 0:
+        raise ValueError(f"Option '{value}' introuvable dans le filtre '{select_id}'")
+
+    # dispatch_event contourne la vérif d'actionability "dans le viewport" de
+    # Playwright : le panneau custom peut dépasser du viewport réel du
+    # navigateur même une fois scrollé dans son propre conteneur.
+    await target_option.dispatch_event("click")
 
 
 async def download_setup(car: str, track: str, current_version: str | None = None) -> tuple[Path | None, str]:
@@ -118,7 +158,7 @@ if __name__ == "__main__":
     import sys
 
     logging.basicConfig(level=logging.INFO)
-    _car = sys.argv[1] if len(sys.argv) > 1 else "Ford+Mustang+LMGT3"
+    _car = sys.argv[1] if len(sys.argv) > 1 else "Toyota+GR010"
     _track = sys.argv[2] if len(sys.argv) > 2 else "Laguna+Seca"
     path, ver = asyncio.run(download_setup(_car, _track))
     print("Téléchargé ->", path, ver)
