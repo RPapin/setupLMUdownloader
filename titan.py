@@ -45,25 +45,66 @@ async def _screenshot_on_error(page: Page, name: str) -> None:
 
 async def _dismiss_welcome_modal(page: Page) -> None:
     """Ferme toute modale ouverte (ModalContent ou HeadlessUI portal)."""
-    # Tentative 1 : modale custom avec classe ModalContent
-    modal = page.locator('[class*="ModalContent"]')
+    portal = page.locator("#headlessui-portal-root")
     try:
-        await modal.wait_for(timeout=2_000)
-        close_btn = modal.locator('button[type="button"]')
-        await close_btn.click()
-        logger.info("Modale ModalContent fermée.")
+        if await portal.count() == 0:
+            return
+    except Exception:
+        return
+
+    # Tentative 1 : bouton de fermeture explicite (X / aria-label Close)
+    close_btn = portal.locator(
+        'button[aria-label="Fermer"]'
+    )
+    try:
+        if await close_btn.count() > 0:
+            await close_btn.first.click(timeout=2_000)
+            await portal.wait_for(state="hidden", timeout=3_000)
+            logger.info("Modale fermée via bouton close.")
+            return
     except Exception:
         pass
 
-    # Tentative 2 : overlay HeadlessUI (headlessui-dialog-overlay)
-    overlay = page.locator('#headlessui-portal-root [id^="headlessui-dialog-overlay"]')
+    # Tentative 2 : Escape (fonctionne pour la plupart des dialogs HeadlessUI)
     try:
-        await overlay.wait_for(state="visible", timeout=2_000)
         await page.keyboard.press("Escape")
-        await overlay.wait_for(state="hidden", timeout=3_000)
-        logger.info("Modale HeadlessUI fermée via Escape.")
+        await portal.wait_for(state="hidden", timeout=3_000)
+        logger.info("Modale fermée via Escape.")
+        return
     except Exception:
         pass
+
+    # Tentative 3 (fallback) : la modale (ex: preview vidéo replay) ne se
+    # ferme pas via Escape/bouton — on la retire de force du DOM pour ne
+    # plus bloquer les clics (elle est de toute façon hors du workflow).
+    try:
+        if await portal.count() > 0:
+            await portal.evaluate("el => el.remove()")
+            logger.warning("Modale portal-root supprimée de force (DOM).")
+    except Exception:
+        pass
+
+
+async def _click_dismissing_modals(page: Page, locator) -> None:
+    """
+    Clique sur `locator`. Le clic "réel" de Playwright déplace la souris sur
+    l'élément avant de cliquer : ce survol rouvre la modale de preview vidéo
+    (ex: "Replays 3D") à chaque tentative, donc fermer la modale puis
+    reréessayer un clic normal boucle indéfiniment. On bascule alors sur un
+    clic JS direct (`el.click()`), qui ne simule aucun survol et n'est donc
+    jamais intercepté par l'overlay.
+    """
+    try:
+        await locator.click(timeout=6_000)
+        return
+    except Exception as exc:
+        logger.warning("Clic réel intercepté (%s) ; fermeture des modales puis clic JS...")
+
+    await _dismiss_welcome_modal(page)
+    try:
+        await locator.evaluate("el => el.click()")
+    except Exception as exc:
+        raise RuntimeError(f"Impossible de cliquer sur l'élément (clic JS) : {exc}") from exc
 
 
 async def _login(page: Page) -> None:
@@ -146,7 +187,7 @@ async def download_setup(car: str, track: str, current_version: str | None = Non
             if count == 0:
                 raise RuntimeError(f"Aucune carte 'Included in Subscription' trouvée ({car} / {track})")
             await _dismiss_welcome_modal(page)
-            await locator.first.click()
+            await _click_dismissing_modals(page, locator.first)
             await page.wait_for_load_state("domcontentloaded")
             await _dismiss_welcome_modal(page)
 
@@ -162,7 +203,7 @@ async def download_setup(car: str, track: str, current_version: str | None = Non
                 )
 
             async with page.expect_download() as download_info:
-                await dl_btn.click()
+                await _click_dismissing_modals(page, dl_btn)
             download = await download_info.value
 
             tmp_dest = config.DOWNLOAD_DIR / f"{car}_{track}.zip"
