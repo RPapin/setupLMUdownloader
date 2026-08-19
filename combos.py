@@ -54,9 +54,9 @@ CARS = [
      "car_titan": "Toyota_TR10_2026", "car_gosetup": "Toyota+GR010"},
     # LMP2
     {"car_hymo": "oreca-07-gibson-2024-wec", "car_drive": "ORECA 07 2024", "class_code": "LMP2",
-     "car_titan": "Oreca_07_LM_2024", "car_gosetup": "Oreca+07+2024"},
+     "car_titan": "Oreca_07_LM_2023", "car_gosetup": "Oreca+07+2024"},
     {"car_hymo": "oreca-07-gibson-2024-elms", "car_drive": "ORECA 07 ELMS", "class_code": "LMP2",
-     "car_titan": "Oreca_07_LM_2024_ELMS", "car_gosetup": "Oreca+07+ELMS"},
+     "car_titan": "Oreca_07_LM_2023", "car_gosetup": "Oreca+07+ELMS"},
     # LMP3
     {"car_hymo": "NOT-FOUND", "car_drive": "Adess AD25 LMP3", "class_code": "LMP3",
      "car_titan": "Porsche_992_GT3R_2023", "car_gosetup": "Adess+AD25+LMP3"},

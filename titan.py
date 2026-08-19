@@ -9,8 +9,13 @@ from pathlib import Path
 from time import sleep
 
 from playwright.async_api import async_playwright, Page
+from playwright_stealth import Stealth
 
 import config
+
+# navigator_platform_override aligné sur l'user-agent Linux utilisé ci-dessous
+# (un mismatch UA/platform serait lui-même un signal de détection).
+_stealth = Stealth(navigator_platform_override="Linux x86_64")
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +36,29 @@ def _extract_version_from_zip(zip_path: Path) -> str:
         logger.warning("Version introuvable dans le nom de fichier : %s", filename)
         return "unknown"
     return match.group(1)
+
+
+async def _log_failed_api_request(req, api_errors: list[str]) -> None:
+    """
+    Logge le détail (statut + corps) de toute requête tracktitan.io en échec (>=400)
+    et l'accumule dans `api_errors`. Permet de distinguer un vrai refus applicatif
+    (ex: 403 "permission denied" sur /download) d'un blocage anti-bot, plutôt qu'un
+    simple TimeoutError opaque sur l'event "download".
+    """
+    if "tracktitan.io" not in req.url:
+        return
+    try:
+        resp = await req.response()
+        if not resp or resp.status < 400:
+            return
+        try:
+            body = (await resp.text())[:1000]
+        except Exception:
+            body = "<unreadable>"
+        logger.warning("Requête échouée %s %s -> status=%s body=%r", req.method, req.url, resp.status, body)
+        api_errors.append(f"{req.method} {req.url} -> {resp.status} {body}")
+    except Exception as exc:
+        logger.debug("Impossible de logger la requête %s: %s", req.url, exc)
 
 
 async def _screenshot_on_error(page: Page, name: str) -> None:
@@ -98,7 +126,7 @@ async def _click_dismissing_modals(page: Page, locator) -> None:
         await locator.click(timeout=6_000)
         return
     except Exception as exc:
-        logger.warning("Clic réel intercepté (%s) ; fermeture des modales puis clic JS...")
+        logger.warning("Clic réel intercepté (%s) ; fermeture des modales puis clic JS...", exc)
 
     await _dismiss_welcome_modal(page)
     try:
@@ -149,7 +177,7 @@ async def download_setup(car: str, track: str, current_version: str | None = Non
     """
     logger.info("Téléchargement setup: car=%s track=%s", car, track)
 
-    async with async_playwright() as p:
+    async with _stealth.use_async(async_playwright()) as p:
         browser = await p.chromium.launch(
             headless=config.HEADLESS,
             args=[
@@ -166,10 +194,6 @@ async def download_setup(car: str, track: str, current_version: str | None = Non
             ),
             viewport={"width": 1280, "height": 800},
         )
-        # Masque navigator.webdriver pour réduire la détection Cloudflare
-        await context.add_init_script(
-            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-        )
         page = await context.new_page()
 
         try:
@@ -179,7 +203,7 @@ async def download_setup(car: str, track: str, current_version: str | None = Non
 
             await page.wait_for_selector(
                 'p[data-testid="setupcard-subscription-details"]',
-                timeout=15_000,
+                timeout=30_000,
             )
             locator = page.locator('a:has(p[data-testid="setupcard-subscription-details"])')
             count = await locator.count()
@@ -191,7 +215,10 @@ async def download_setup(car: str, track: str, current_version: str | None = Non
             await page.wait_for_load_state("domcontentloaded")
             await _dismiss_welcome_modal(page)
 
-            dl_btn = page.get_by_role("button", name="Télécharger la dernière version")
+            dl_btn = page.get_by_role(
+                "button",
+                name=re.compile(r"(Télécharger la dernière version|Download Latest Version)", re.IGNORECASE),
+            )
 
             try:
                 await dl_btn.wait_for(state="visible", timeout=20_000)
@@ -202,8 +229,39 @@ async def download_setup(car: str, track: str, current_version: str | None = Non
                     f"title={await page.title()!r} url={page.url}"
                 )
 
-            async with page.expect_download() as download_info:
-                await _click_dismissing_modals(page, dl_btn)
+            popups: list[Page] = []
+            api_errors: list[str] = []
+            context.on("page", lambda new_page: popups.append(new_page))
+            page.on(
+                "requestfinished",
+                lambda req: asyncio.create_task(_log_failed_api_request(req, api_errors)),
+            )
+
+            try:
+                # expect_event sur le context (et pas page.expect_download) car en
+                # headless le download peut être déclenché depuis un nouvel onglet
+                # ouvert par le clic plutôt que sur la page courante.
+                async with context.expect_event("download", timeout=30_000) as download_info:
+                    await _click_dismissing_modals(page, dl_btn)
+            except Exception:
+                await _screenshot_on_error(page, "titan_download_timeout")
+                extra = ""
+                if popups:
+                    popup = popups[-1]
+                    try:
+                        await popup.screenshot(
+                            path=str(config.DOWNLOAD_DIR / "debug_titan_download_popup.png"),
+                            full_page=True,
+                        )
+                        extra = f" | popup ouvert: title={await popup.title()!r} url={popup.url}"
+                    except Exception:
+                        extra = " | popup ouvert (impossible de capturer titre/url)"
+                if api_errors:
+                    extra += " | requêtes API échouées: " + " ; ".join(api_errors[-3:])
+                raise RuntimeError(
+                    f"Timeout en attendant le download — "
+                    f"title={await page.title()!r} url={page.url}{extra}"
+                )
             download = await download_info.value
 
             tmp_dest = config.DOWNLOAD_DIR / f"{car}_{track}.zip"
