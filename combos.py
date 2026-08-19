@@ -6,7 +6,7 @@ Mapping des combos voiture/circuit.
 CARS = [
     # LMGT3
     {"car_hymo": "aston-martin-vantage-gt3-evo", "car_drive": "Aston Martin EVO", "class_code": "LMGT3",
-     "car_titan": "Vantage_AMR_GT3Evo_2024", "car_gosetup": "Aston+Martin+Vantage+AMR+LMGT3"},
+     "car_titan": "51", "car_gosetup": "Aston+Martin+Vantage+AMR+LMGT3"},
     {"car_hymo": "bmw-m4-lmgt3", "car_drive": "BMW M4 GT3", "class_code": "LMGT3", "car_titan": "BMW_M4_LMGT3_2023",
      "car_gosetup": "BMW+M4+LMGT3"},
     {"car_hymo": "corvette-z06-gt3-r", "car_drive": "Corvette Z06 LMGT3", "class_code": "LMGT3",
@@ -54,9 +54,9 @@ CARS = [
      "car_titan": "Toyota_TR10_2026", "car_gosetup": "Toyota+GR010"},
     # LMP2
     {"car_hymo": "oreca-07-gibson-2024-wec", "car_drive": "ORECA 07 2024", "class_code": "LMP2",
-     "car_titan": "Oreca_07_LM_2024", "car_gosetup": "Oreca+07+2024"},
+     "car_titan": "Oreca_07_LM_2023", "car_gosetup": "Oreca+07+2024"},
     {"car_hymo": "oreca-07-gibson-2024-elms", "car_drive": "ORECA 07 ELMS", "class_code": "LMP2",
-     "car_titan": "Oreca_07_LM_2024_ELMS", "car_gosetup": "Oreca+07+ELMS"},
+     "car_titan": "Oreca_07_LM_2023", "car_gosetup": "Oreca+07+ELMS"},
     # LMP3
     {"car_hymo": "NOT-FOUND", "car_drive": "Adess AD25 LMP3", "class_code": "LMP3",
      "car_titan": "Porsche_992_GT3R_2023", "car_gosetup": "Adess+AD25+LMP3"},
@@ -69,7 +69,7 @@ CARS = [
 ]
 
 TRACKS = [
-    {"track_hymo": "bahrain", "track_drive": "Bahrain", "track_titan": "Bahrainwec",
+    {"track_hymo": "1078", "track_drive": "Bahrain", "track_titan": "1078",
      "track_gosetup": "Bahrain+Endurance"},
     {"track_hymo": "circuit-de-barcelona", "track_drive": "Barcelona", "track_titan": "circuit_de_barcelona",
      "track_gosetup": "Barcelona"},

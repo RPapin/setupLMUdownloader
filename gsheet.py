@@ -87,78 +87,116 @@ def _get_log_worksheet(sh):
 
 
 def _get_or_create_matrix_sheet(sh, site: str):
-    """Retourne l'onglet Matrix du site, le crée et l'initialise avec ❌ si absent."""
+    """Retourne l'onglet Matrix du site, le crée/agrandit et l'initialise avec ❌ si besoin."""
     sheet_name = SITE_MATRIX_NAMES[site]
     car_names = [c["car_drive"] for c in combos.CARS]
     track_names = [t["track_drive"] for t in combos.TRACKS]
     n_cars, n_tracks = len(car_names), len(track_names)
+    needed_rows, needed_cols = n_tracks + 2, n_cars + 1
 
     try:
         ws = sh.worksheet(sheet_name)
     except gspread.WorksheetNotFound:
-        ws = sh.add_worksheet(
-            title=sheet_name,
-            rows=n_tracks + 2,
-            cols=n_cars + 1,
-        )
-
-        # Row 1: class code on first car of each group, empty for the rest
-        class_header = [""]
-        current_class = None
-        for car in combos.CARS:
-            if car["class_code"] != current_class:
-                class_header.append(car["class_code"])
-                current_class = car["class_code"]
-            else:
-                class_header.append("")
-
-        car_header = [""] + car_names
-        data_rows = [[name] + ["❌"] * n_cars for name in track_names]
-        ws.update([class_header, car_header] + data_rows)
+        ws = sh.add_worksheet(title=sheet_name, rows=needed_rows, cols=needed_cols)
+        existing_cells = {}
         logger.info("Onglet '%s' créé (%d voitures × %d circuits)", sheet_name, n_cars, n_tracks)
+    else:
+        # Onglet existant : on préserve les cellules déjà remplies (versions/liens),
+        # puis on agrandit la grille si combos.py a grossi depuis sa création.
+        existing_data = ws.get_all_values(value_render_option=ValueRenderOption.formula)
+        existing_cells = {}
+        if len(existing_data) >= 3:
+            existing_car_names = existing_data[1][1:]
+            for row in existing_data[2:]:
+                if not row:
+                    continue
+                track_name = row[0]
+                for i, cell in enumerate(row[1:]):
+                    if cell and cell != "❌" and i < len(existing_car_names):
+                        existing_cells[(existing_car_names[i], track_name)] = cell
 
-        # Merge class header cells across each class group
-        merge_requests = []
-        class_start_col = None
-        current_class = None
-        for i, car in enumerate(combos.CARS):
-            if car["class_code"] != current_class:
-                if current_class is not None:
-                    end_col = i + 1  # car i is at column i+1 (col 0 = track names)
-                    if end_col - class_start_col > 1:
-                        merge_requests.append({
-                            "mergeCells": {
-                                "range": {
-                                    "sheetId": ws.id,
-                                    "startRowIndex": 0,
-                                    "endRowIndex": 1,
-                                    "startColumnIndex": class_start_col,
-                                    "endColumnIndex": end_col,
-                                },
-                                "mergeType": "MERGE_ALL",
-                            }
-                        })
-                current_class = car["class_code"]
-                class_start_col = i + 1
+        if ws.row_count < needed_rows or ws.col_count < needed_cols:
+            ws.resize(rows=max(ws.row_count, needed_rows), cols=max(ws.col_count, needed_cols))
+            logger.info(
+                "Onglet '%s' agrandi (%d voitures × %d circuits)", sheet_name, n_cars, n_tracks
+            )
 
-        # Last class group
-        end_col = n_cars + 1
-        if current_class is not None and end_col - class_start_col > 1:
-            merge_requests.append({
-                "mergeCells": {
-                    "range": {
-                        "sheetId": ws.id,
-                        "startRowIndex": 0,
-                        "endRowIndex": 1,
-                        "startColumnIndex": class_start_col,
-                        "endColumnIndex": end_col,
-                    },
-                    "mergeType": "MERGE_ALL",
-                }
-            })
+    # (Re)construit les en-têtes et les lignes de données à partir de combos.py,
+    # en réinjectant les cellules déjà remplies (idempotent, sûr pour un onglet existant).
+    class_header = [""]
+    current_class = None
+    for car in combos.CARS:
+        if car["class_code"] != current_class:
+            class_header.append(car["class_code"])
+            current_class = car["class_code"]
+        else:
+            class_header.append("")
 
-        if merge_requests:
-            sh.batch_update({"requests": merge_requests})
+    car_header = [""] + car_names
+    data_rows = []
+    for track in track_names:
+        row = [track]
+        for car in car_names:
+            row.append(existing_cells.get((car, track), "❌"))
+        data_rows.append(row)
+
+    ws.update([class_header, car_header] + data_rows, value_input_option="USER_ENTERED")
+
+    # Merge class header cells across each class group (idempotent)
+    merge_requests = []
+    class_start_col = None
+    current_class = None
+    for i, car in enumerate(combos.CARS):
+        if car["class_code"] != current_class:
+            if current_class is not None:
+                end_col = i + 1  # car i is at column i+1 (col 0 = track names)
+                if end_col - class_start_col > 1:
+                    merge_requests.append({
+                        "mergeCells": {
+                            "range": {
+                                "sheetId": ws.id,
+                                "startRowIndex": 0,
+                                "endRowIndex": 1,
+                                "startColumnIndex": class_start_col,
+                                "endColumnIndex": end_col,
+                            },
+                            "mergeType": "MERGE_ALL",
+                        }
+                    })
+            current_class = car["class_code"]
+            class_start_col = i + 1
+
+    # Last class group
+    end_col = n_cars + 1
+    if current_class is not None and end_col - class_start_col > 1:
+        merge_requests.append({
+            "mergeCells": {
+                "range": {
+                    "sheetId": ws.id,
+                    "startRowIndex": 0,
+                    "endRowIndex": 1,
+                    "startColumnIndex": class_start_col,
+                    "endColumnIndex": end_col,
+                },
+                "mergeType": "MERGE_ALL",
+            }
+        })
+
+    # Clear any stale merges on the header row first (car order/count may have
+    # changed since the sheet was created), then reapply the current merges.
+    unmerge_request = {
+        "unmergeCells": {
+            "range": {
+                "sheetId": ws.id,
+                "startRowIndex": 0,
+                "endRowIndex": 1,
+                "startColumnIndex": 0,
+                "endColumnIndex": ws.col_count,
+            }
+        }
+    }
+    requests = [unmerge_request] + merge_requests
+    sh.batch_update({"requests": requests})
 
     sh.batch_update({"requests": [{
         "updateDimensionProperties": {
